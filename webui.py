@@ -1,6 +1,8 @@
 import gradio as gr
 import time
 import numpy as np
+from dataclasses import dataclass
+from typing import Optional, Any
 
 # 模拟的模型选项
 END_TO_END_MODELS = [
@@ -15,6 +17,51 @@ SEPARATED_MODELS = {
     "LLM": ["Qwen3-4B-Instruct", "Qwen3-8B"],
     "TTS": ["Bark", "VITS", "Tacotron2"]
 }
+
+@dataclass
+class AudioProcessParams:
+    """音频处理参数封装"""
+    audio_input: Any
+    conversation_mode: str
+    system_prompt: str
+    language: str
+    speed: float
+    emotion: str
+    end_to_end_model: str
+    asr_model: str
+    llm_model: str
+    tts_model: str
+    text_input: str
+    image_input: Any
+    video_input: Any
+
+@dataclass
+class ActiveInputs:
+    """活动输入参数封装"""
+    audio_input: Any
+    text_input: str
+    image_input: Any
+    video_input: Any
+
+def process_audio_params(params: AudioProcessParams):
+    """
+    处理音频输入并返回响应 (参数封装版本)
+    """
+    return process_audio(
+        params.audio_input,
+        params.conversation_mode,
+        params.system_prompt,
+        params.language,
+        params.speed,
+        params.emotion,
+        params.end_to_end_model,
+        params.asr_model,
+        params.llm_model,
+        params.tts_model,
+        params.text_input,
+        params.image_input,
+        params.video_input
+    )
 
 def process_audio(audio_input, conversation_mode, system_prompt, language, speed, emotion,
                   end_to_end_model, asr_model, llm_model, tts_model, text_input, image_input, video_input):
@@ -100,6 +147,35 @@ def update_model_selection(mode):
 def save_system_prompt(prompt):
     """保存系统提示词"""
     return f"系统提示词已保存: {prompt[:50]}..." if len(prompt) > 50 else f"系统提示词已保存: {prompt}"
+
+def get_active_inputs(conversation_mode, audio_multi, audio_single, text_inp, image_inp, video_inp):
+    """根据对话模式选择活动的输入"""
+    if conversation_mode == "全模态模型":
+        return ActiveInputs(audio_multi, text_inp, image_inp, video_inp)
+    else:
+        return ActiveInputs(audio_single, "", None, None)
+
+def handle_submit(mode, audio_multi, audio_single, text_inp, image_inp, video_inp, 
+                 system_prompt, language, speed, emotion, end_to_end_model, 
+                 asr_model, llm_model, tts_model):
+    """提交按钮处理函数"""
+    active_inputs = get_active_inputs(mode, audio_multi, audio_single, text_inp, image_inp, video_inp)
+    params = AudioProcessParams(
+        active_inputs.audio_input,
+        mode,
+        system_prompt,
+        language,
+        speed,
+        emotion,
+        end_to_end_model,
+        asr_model,
+        llm_model,
+        tts_model,
+        active_inputs.text_input,
+        active_inputs.image_input,
+        active_inputs.video_input
+    )
+    return process_audio_params(params)
 
 with gr.Blocks(title="实时语音对话系统") as demo:
     gr.Markdown("# 🎙️ 实时语音对话系统")
@@ -261,20 +337,8 @@ with gr.Blocks(title="实时语音对话系统") as demo:
         outputs=[end_to_end_model, asr_model, llm_model, tts_model]
     )
     
-    def get_active_inputs(conversation_mode, audio_multi, audio_single, text_inp, image_inp, video_inp):
-        """根据对话模式选择活动的输入"""
-        if conversation_mode == "全模态模型":
-            return audio_multi, text_inp, image_inp, video_inp
-        else:
-            return audio_single, "", None, None
-    
     submit_btn.click(
-        fn=lambda mode, audio_multi, audio_single, text_inp, image_inp, video_inp, 
-                system_prompt, language, speed, emotion, end_to_end_model, 
-                asr_model, llm_model, tts_model: 
-                process_audio(*get_active_inputs(mode, audio_multi, audio_single, text_inp, image_inp, video_inp),
-                            mode, system_prompt, language, speed, emotion,
-                            end_to_end_model, asr_model, llm_model, tts_model),
+        fn=handle_submit,
         inputs=[conversation_mode, audio_input_multi, audio_input_single, text_input, image_input, video_input,
                 system_prompt, language, speed, emotion, end_to_end_model, asr_model, llm_model, tts_model],
         outputs=[audio_output, transcription_output, response_output]
