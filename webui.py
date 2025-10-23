@@ -31,6 +31,74 @@ class AudioProcessParams:
     llm_model: str = ""                         # LLM模型选择
     tts_model: str = ""                         # TTS模型选择
 
+@dataclass
+class InputParams:
+    """
+    输入参数封装类
+    
+    用于封装get_active_inputs函数所需的参数。
+    """
+    conversation_mode: str              # 对话模式
+    audio_multi: Optional[str]          # 多模态音频输入
+    audio_single: Optional[str]         # 单模态音频输入
+    text_inp: str                       # 文本输入
+    image_inp: Optional[str]            # 图像输入
+    video_inp: Optional[str]            # 视频输入
+
+@dataclass
+class CreateParams:
+    """
+    创建参数封装类
+    
+    用于封装create_audio_params函数所需的参数。
+    """
+    # 模式和输入参数
+    mode: str = ""
+    audio_multi: Optional[str] = None
+    audio_single: Optional[str] = None
+    text_inp: str = ""
+    image_inp: Optional[str] = None
+    video_inp: Optional[str] = None
+    
+    # 配置参数
+    system_prompt: str = ""
+    language: str = "中文"
+    speed: float = 1.0
+    emotion: str = "默认"
+    
+    # 模型参数
+    end_to_end_model: str = ""
+    asr_model: str = ""
+    llm_model: str = ""
+    tts_model: str = ""
+
+@dataclass
+class SubmitParams:
+    """
+    提交参数封装类
+    
+    用于封装handle_submit函数所需的参数。
+    """
+    # 模式和输入参数
+    mode: str = ""
+    audio_multi: Optional[str] = None
+    audio_single: Optional[str] = None
+    text_inp: str = ""
+    image_inp: Optional[str] = None
+    video_inp: Optional[str] = None
+    
+    # 配置参数
+    system_prompt: str = ""
+    language: str = "中文"
+    speed: float = 1.0
+    emotion: str = "默认"
+    
+    # 模型参数
+    end_to_end_model: str = ""
+    asr_model: str = ""
+    llm_model: str = ""
+    tts_model: str = ""
+
 # 模拟的端到端模型选项
 END_TO_END_MODELS = [
     "Qwen2.5-Omni-3B",
@@ -102,7 +170,7 @@ def process_audio(params: AudioProcessParams):
         current_config = f"- ASR模型: {params.asr_model}\n- LLM模型: {params.llm_model}\n- TTS模型: {params.tts_model}"
     
     # 构建AI响应文本，包含当前设置信息
-    ai_response = f"你好！我已经收到你的{input_types}信息。当前设置:\n- 模式: {params.conversation_mode}\n{current_config}\n- 语言: {params.language}\n- 语速: {params.speed}\n- 情感: {params.emotion}"
+    ai_response = f"你好！我已经收到你的{input_types}信息。"
     
     # 模拟生成响应音频（440Hz正弦波，持续2秒）
     sample_rate = 22050
@@ -165,6 +233,139 @@ def update_model_selection(mode):
             gr.update(visible=True),   # LLM模型
             gr.update(visible=True)    # TTS模型
         ]
+
+def get_active_inputs(params: InputParams):
+    """
+    根据对话模式选择活动的输入
+    
+    Args:
+        params (InputParams): 封装了所有输入参数的对象
+        
+    Returns:
+        tuple: 活动输入的元组 (audio_input, text_input, image_input, video_input)
+    """
+    if params.conversation_mode == "全模态模型":
+        return params.audio_multi, params.text_inp, params.image_inp, params.video_inp
+    else:
+        return params.audio_single, "", None, None
+
+def create_audio_params(params: CreateParams):
+    """
+    创建AudioProcessParams实例
+    
+    Args:
+        params (CreateParams): 封装了所有创建参数的对象
+        
+    Returns:
+        AudioProcessParams: 封装了所有参数的对象
+    """
+    # 获取当前活动的输入
+    input_params = InputParams(
+        conversation_mode=params.mode,
+        audio_multi=params.audio_multi,
+        audio_single=params.audio_single,
+        text_inp=params.text_inp,
+        image_inp=params.image_inp,
+        video_inp=params.video_inp
+    )
+    
+    audio_input, text_input, image_input, video_input = get_active_inputs(input_params)
+    
+    # 创建并返回参数对象
+    return AudioProcessParams(
+        audio_input=audio_input,
+        text_input=text_input,
+        image_input=image_input,
+        video_input=video_input,
+        conversation_mode=params.mode,
+        system_prompt=params.system_prompt,
+        language=params.language,
+        speed=params.speed,
+        emotion=params.emotion,
+        end_to_end_model=params.end_to_end_model,
+        asr_model=params.asr_model,
+        llm_model=params.llm_model,
+        tts_model=params.tts_model
+    )
+
+def handle_submit(params: SubmitParams):
+    """
+    处理提交按钮点击事件
+    
+    Args:
+        params (SubmitParams): 封装了所有提交所需参数的对象
+        
+    Returns:
+        tuple: (音频输出, 转录文本, AI响应文本)
+    """
+    # 创建参数对象
+    create_params = CreateParams(
+        mode=params.mode,
+        audio_multi=params.audio_multi,
+        audio_single=params.audio_single,
+        text_inp=params.text_inp,
+        image_inp=params.image_inp,
+        video_inp=params.video_inp,
+        system_prompt=params.system_prompt,
+        language=params.language,
+        speed=params.speed,
+        emotion=params.emotion,
+        end_to_end_model=params.end_to_end_model,
+        asr_model=params.asr_model,
+        llm_model=params.llm_model,
+        tts_model=params.tts_model
+    )
+    
+    # 处理音频并返回结果
+    return process_audio(create_audio_params(create_params))
+
+def handle_submit_adapter(mode, audio_multi, audio_single, text_inp, image_inp, video_inp,
+                         system_prompt, language, speed, emotion, end_to_end_model,
+                         asr_model, llm_model, tts_model):
+    """
+    提交处理适配器函数
+    
+    将Gradio的参数列表转换为SubmitParams对象，然后调用handle_submit函数。
+    
+    Args:
+        mode (str): 对话模式
+        audio_multi: 多模态音频输入
+        audio_single: 单模态音频输入
+        text_inp (str): 文本输入
+        image_inp: 图像输入
+        video_inp: 视频输入
+        system_prompt (str): 系统提示词
+        language (str): 语言设置
+        speed (float): 语速
+        emotion (str): 情感设置
+        end_to_end_model (str): 端到端模型
+        asr_model (str): ASR模型
+        llm_model (str): LLM模型
+        tts_model (str): TTS模型
+        
+    Returns:
+        tuple: (音频输出, 转录文本, AI响应文本)
+    """
+    # 创建参数对象
+    params = SubmitParams(
+        mode=mode,
+        audio_multi=audio_multi,
+        audio_single=audio_single,
+        text_inp=text_inp,
+        image_inp=image_inp,
+        video_inp=video_inp,
+        system_prompt=system_prompt,
+        language=language,
+        speed=speed,
+        emotion=emotion,
+        end_to_end_model=end_to_end_model,
+        asr_model=asr_model,
+        llm_model=llm_model,
+        tts_model=tts_model
+    )
+    
+    # 调用处理函数
+    return handle_submit(params)
 
 def save_system_prompt(prompt):
     """
@@ -340,44 +541,9 @@ with gr.Blocks(title="实时语音对话系统") as demo:
         outputs=[end_to_end_model, asr_model, llm_model, tts_model]
     )
     
-    def get_active_inputs(conversation_mode, audio_multi, audio_single, text_inp, image_inp, video_inp):
-        """根据对话模式选择活动的输入"""
-        if conversation_mode == "全模态模型":
-            return audio_multi, text_inp, image_inp, video_inp
-        else:
-            return audio_single, "", None, None
-    
-    def create_audio_params(mode, audio_multi, audio_single, text_inp, image_inp, video_inp,
-                           system_prompt, language, speed, emotion, end_to_end_model,
-                           asr_model, llm_model, tts_model):
-        """创建AudioProcessParams实例"""
-        audio_input, text_input, image_input, video_input = get_active_inputs(
-            mode, audio_multi, audio_single, text_inp, image_inp, video_inp
-        )
-        
-        return AudioProcessParams(
-            audio_input=audio_input,
-            text_input=text_input,
-            image_input=image_input,
-            video_input=video_input,
-            conversation_mode=mode,
-            system_prompt=system_prompt,
-            language=language,
-            speed=speed,
-            emotion=emotion,
-            end_to_end_model=end_to_end_model,
-            asr_model=asr_model,
-            llm_model=llm_model,
-            tts_model=tts_model
-        )
-    
+    # 提交按钮点击事件处理
     submit_btn.click(
-        fn=lambda mode, audio_multi, audio_single, text_inp, image_inp, video_inp,
-                system_prompt, language, speed, emotion, end_to_end_model,
-                asr_model, llm_model, tts_model:
-                process_audio(create_audio_params(mode, audio_multi, audio_single, text_inp, image_inp, video_inp,
-                                                system_prompt, language, speed, emotion, end_to_end_model,
-                                                asr_model, llm_model, tts_model)),
+        fn=handle_submit_adapter,
         inputs=[conversation_mode, audio_input_multi, audio_input_single, text_input, image_input, video_input,
                 system_prompt, language, speed, emotion, end_to_end_model, asr_model, llm_model, tts_model],
         outputs=[audio_output, transcription_output, response_output]
